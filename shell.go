@@ -11,23 +11,24 @@ import (
 	"syscall"
 )
 
-	type Shell struct {
+type Shell struct {
 		history 			[]string
 		historyFile 	string
 		workDir 			string
 		aliases 			map[string]string
 		aliasFile 		string
-	}
+}
 
-	type Command struct {
+type Command struct {
 		Args 					[]string
 		Stdin 				string 		// For <
 		Stdout 				string 		// For >
 		StdoutAppend 	bool 			// For >>
-	}
+}
 
-	func NewShell() (*Shell, error) {
+func NewShell() (*Shell, error) {
 		homeDir, err := os.UserHomeDir()
+		
 		if err != nil {
 			return nil, err
 		}
@@ -37,6 +38,7 @@ import (
 
 
 		workDir, err := os.Getwd()
+		
 		if err != nil {
 			return nil, err
 		}
@@ -51,13 +53,14 @@ import (
 		shell.loadHistory()
 		shell.loadAliases()
 		return shell, nil
-	}
+}
 
-	func (s *Shell) loadAliases() error {
+func (s *Shell) loadAliases() error {
 		file, err := os.OpenFile(s.aliasFile, os.O_CREATE|os.O_RDONLY, 0644)
 		if err != nil {
 			return err
 		}
+
 		defer file.Close()
 
 		scanner := bufio.NewScanner(file)
@@ -67,22 +70,25 @@ import (
 				s.aliases[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
 			}
 		}
+		
 		return scanner.Err()
-	}
+}
 
-	func (s *Shell) saveAlias(name, command string) error {
+func (s *Shell) saveAlias(name, command string) error {
     s.aliases[name] = command
     f, err := os.OpenFile(s.aliasFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-    if err != nil {
+    
+		if err != nil {
         return err
     }
-    defer f.Close()
+    
+		defer f.Close()
     
     _, err = fmt.Fprintf(f, "%s=%s\n", name, command)
     return err
-	}
+}
 
-	func (s *Shell) parseCommandWithRedirection(input string) ([]Command, error) {
+func (s *Shell) parseCommandWithRedirection(input string) ([]Command, error) {
 		parts := strings.Split(input, "|")
 		commands := make([]Command, 0, len(parts))
 
@@ -120,9 +126,9 @@ import (
 		}
 
 		return commands, nil
-	}
+}
 
-	func (s *Shell) executeCommand(cmd Command) error {
+func (s *Shell) executeCommand(cmd Command) error {
 		if len(cmd.Args) == 0 {
 			return nil
 		}
@@ -149,9 +155,11 @@ import (
 			}
 
 			file, err := os.OpenFile(cmd.Stdout, flag, 0644)
+			
 			if err != nil {
 				return fmt.Errorf("failed to open output file: %v", err)
 			}
+			
 			defer file.Close()
 			execCmd.Stdout = file
 		} else {
@@ -160,13 +168,15 @@ import (
 
 		execCmd.Stderr = os.Stderr
 		return execCmd.Run()
-	} 
+} 
 
-	func (s *Shell) loadHistory() error {
+func (s *Shell) loadHistory() error {
 		file, err := os.OpenFile(s.historyFile, os.O_CREATE|os.O_RDWR, 0644)
+		
 		if err != nil {
 			return err
 		}
+		
 		defer file.Close()
 
 		scanner := bufio.NewScanner(file)
@@ -174,28 +184,30 @@ import (
 			s.history = append(s.history, scanner.Text())
 		}
 		return scanner.Err()
-	}
+}
 
-	func (s *Shell) addToHistory(cmd string) {
+func (s *Shell) addToHistory(cmd string) {
 		if cmd == "" {
 			return
 		}
 		s.history = append(s.history, cmd)
 
 		f, err := os.OpenFile(s.historyFile, os.O_CREATE|os.O_RDWR, 0644)
+		
 		if err != nil {
 			defer f.Close()
 			fmt.Fprintln(f, cmd)
 		}
-	}
+}
 
 
-	func (s *Shell) executePipeline(commands []Command) error {
+func (s *Shell) executePipeline(commands []Command) error {
 		if len(commands) == 1 {
 			return s.executeCommand(commands[0])
 		}
 
 		var cmds []*exec.Cmd
+		
 		for _, command:= range commands {
 			cmd := exec.Command(command.Args[0], command.Args[1:]...)
 			cmds = append(cmds, cmd)
@@ -203,6 +215,7 @@ import (
 
 		for i := 0; i < len(cmds) - 1; i++ {
 			pipe, err := cmds[i].StdoutPipe()
+			
 			if err != nil {
 				return err
 			}
@@ -258,22 +271,22 @@ import (
 		return nil
 	}
 
-	func (s *Shell) parseCommand(input string) [][]string {
-		pipeParts := strings.Split(input, "|")
-		commands := make([][]string, 0, len(pipeParts))
+// func (s *Shell) parseCommand(input string) [][]string {
+// 		pipeParts := strings.Split(input, "|")
+// 		commands := make([][]string, 0, len(pipeParts))
 
-		for _, part := range pipeParts {
-			part = strings.TrimSpace(part)
-			if part == "" {
-				continue
-			}
-			commands = append(commands, strings.Fields(part))
-		}
+// 		for _, part := range pipeParts {
+// 			part = strings.TrimSpace(part)
+// 			if part == "" {
+// 				continue
+// 			}
+// 			commands = append(commands, strings.Fields(part))
+// 		}
 
-		return commands
-	}
+// 		return commands
+// }
 
-	func (s *Shell) executeBuiltin(cmd Command) (bool, error) {
+func (s *Shell) executeBuiltin(cmd Command) (bool, error) {
 		switch cmd.Args[0] {
 		case "cd":
 			if len(cmd.Args) < 2 {
@@ -323,13 +336,13 @@ import (
 	return false, nil
 }
 
-	func (s *Shell) prompt() string {
+func (s *Shell) prompt() string {
 		username := os.Getenv("USER")
 		hostname, _ := os.Hostname()
 		return fmt.Sprintf("%s@%s:%s$ ", username, hostname, s.workDir)
 	}
 
-	func setupSignalHandler() {
+func setupSignalHandler() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
@@ -339,55 +352,55 @@ import (
 				// maybe some more complex logic later
 			}
 		}()
-	}
+}
 
 func main() {
-    shell, err := NewShell()
-    if err != nil {
-        fmt.Fprintf(os.Stderr, "Failed to initialize shell: %v\n", err)
-        os.Exit(1)
-    }
+	shell, err := NewShell()
+	if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to initialize shell: %v\n", err)
+			os.Exit(1)
+	}
 
-    setupSignalHandler()
-    reader := bufio.NewReader(os.Stdin)
+	setupSignalHandler()
+	reader := bufio.NewReader(os.Stdin)
 
-    for {
-        fmt.Print(shell.prompt())
-        
-        input, err := reader.ReadString('\n')
-        if err != nil {
-            fmt.Fprintln(os.Stderr, "Error reading input:", err)
-            continue
-        }
+	for {
+			fmt.Print(shell.prompt())
+			
+			input, err := reader.ReadString('\n')
+			if err != nil {
+					fmt.Fprintln(os.Stderr, "Error reading input:", err)
+					continue
+			}
 
-        input = strings.TrimSpace(input)
-        if input == "" {
-            continue
-        }
+			input = strings.TrimSpace(input)
+			if input == "" {
+					continue
+			}
 
-        shell.addToHistory(input)
-        input = os.ExpandEnv(input)
+			shell.addToHistory(input)
+			input = os.ExpandEnv(input)
 
-        commands, err := shell.parseCommandWithRedirection(input)
-        if err != nil {
-            fmt.Fprintln(os.Stderr, "Error parsing command:", err)
-            continue
-        }
+			commands, err := shell.parseCommandWithRedirection(input)
+			if err != nil {
+					fmt.Fprintln(os.Stderr, "Error parsing command:", err)
+					continue
+			}
 
-        if len(commands) == 0 {
-            continue
-        }
+			if len(commands) == 0 {
+					continue
+			}
 
-        if isBuiltin, err := shell.executeBuiltin(commands[0]); isBuiltin {
-            if err != nil {
-                fmt.Fprintln(os.Stderr, "Error:", err)
-            }
-            continue
-        }
+			if isBuiltin, err := shell.executeBuiltin(commands[0]); isBuiltin {
+					if err != nil {
+							fmt.Fprintln(os.Stderr, "Error:", err)
+					}
+					continue
+			}
 
-        err = shell.executePipeline(commands)
-        if err != nil {
-            fmt.Fprintln(os.Stderr, "Error:", err)
-        }
-    }
+			err = shell.executePipeline(commands)
+			if err != nil {
+					fmt.Fprintln(os.Stderr, "Error:", err)
+			}
+	}
 }
